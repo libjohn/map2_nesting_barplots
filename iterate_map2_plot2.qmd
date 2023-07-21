@@ -10,6 +10,7 @@ editor: visual
 
 library(tidyverse)
 library(patchwork)
+library(tidytext)
 
 ```
 
@@ -110,4 +111,47 @@ starwars |>
   theme_void() +
   theme(strip.text = element_text(size = 20)) +
   facet_wrap(vars(str_to_title(gender)), scales = "free")
+```
+
+```{r}
+# manipulate data for clarity
+star_fluid_df <- starwars |> 
+  drop_na(gender) |> 
+  count(eye_color, name = "total") |> 
+  slice_max(total, n = 5) |> 
+  mutate(gender = "fluid")
+
+sw_special_df <- starwars |> 
+  drop_na(gender) |>
+  select(name, height, mass, gender, sex, eye_color) |> 
+  mutate(eye_color = fct_lump_min(eye_color, 12)) |> 
+  summarise(total = n(), .by = c(eye_color, gender)) |> 
+  bind_rows(star_fluid_df) |> 
+  mutate(total = if_else(gender == "feminine", total * 4, total)) |> 
+  mutate(total = if_else(gender == "fluid", total * 2, total))  
+
+
+# build faceted plot  
+sw_special_df |> 
+  ggplot(aes(y = reorder_within(eye_color, total, gender),
+             x = total, 
+             label = str_to_title(abbreviate(eye_color, 
+                                             minlength = 5)))) +
+  geom_col(fill = "grey90") +
+  geom_col(data = sw_special_df |>  
+             slice_max(total, by = gender),
+           fill = "darkorange") +
+  geom_text(color = "dodgerblue3", size = 5, 
+            hjust = 1.1, nudge_y = 0.15) +
+  geom_text(aes(label = total), hjust = 1.3, 
+            nudge_y = -0.2,
+            color = "dodgerblue3") +
+  tidytext::scale_y_reordered() +
+  theme_void() +
+  theme(strip.text = element_text(size = 16),
+        plot.title = element_text(size=22)) +
+  facet_wrap(vars(str_to_title(gender)), scales = "free_y") +
+  labs(title = "Eye Color by gender",
+       subtitle = "Starwars characters\n", 
+       caption = "Source: `dplyr::starwars`")
 ```
